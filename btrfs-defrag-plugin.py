@@ -33,10 +33,9 @@ PATH=subprocess.check_output(["rpm", "--eval", "%_dbpath"], **popen_kwargs).stri
 
 def dbg(args):
     if not DEBUG: return
-    f=open(LOGFILE, "a+")
-    f.write(args)
-    f.write("\n")
-    f.close()
+    with open(LOGFILE, "a+") as f:
+        f.write(args)
+        f.write("\n")
 
 def qx(args):
     out=subprocess.Popen(args, shell=True, stdout=subprocess.PIPE, **popen_kwargs).stdout
@@ -45,7 +44,7 @@ def qx(args):
     return outstr
 
 def fstype(path):
-    ret=qx('stat -f --format=%T "'+path+'"')
+    ret = qx(f'stat -f --format=%T "{path}"')
     return ret.rstrip()
 
 class BtrfsDefragPlugin(Plugin):
@@ -56,26 +55,27 @@ class BtrfsDefragPlugin(Plugin):
     self.ack()
 
   def PLUGINEND(self, headers, body):
-    dbg('--- Btrfs defrag plugin end: %s %s\n' % (str(headers), str(body)))
-    dbg('--- fstype(%s) = |%s|' % (PATH, fstype(PATH)))
-    if fstype(PATH) != 'btrfs':
-        self.ack()
-        return
-    if DEBUG:
-        dbg('--- Fragmentation before')
-        dbg(qx('filefrag %s/*' % (PATH)))
-    # defrag options:
-    # - verbose
-    # - recursive
-    # - flush each file before going to the next one
-    # - set the extent target hint
-    ret = qx('btrfs filesystem defragment -v -f -r -t %s "%s"' % \
-            (str(EXTENT_SIZE), PATH))
-    if DEBUG:
-        dbg(ret)
-        dbg('--- Fragmentation after')
-        dbg(qx('filefrag %s/*' % (PATH)))
-    self.ack()
+      dbg('--- Btrfs defrag plugin end: %s %s\n' % (str(headers), str(body)))
+      dbg(f'--- fstype({PATH}) = |{fstype(PATH)}|')
+      if fstype(PATH) != 'btrfs':
+          self.ack()
+          return
+      if DEBUG:
+          dbg('--- Fragmentation before')
+          dbg(qx(f'filefrag {PATH}/*'))
+        # defrag options:
+        # - verbose
+        # - recursive
+        # - flush each file before going to the next one
+        # - set the extent target hint
+      ret = qx(
+          f'btrfs filesystem defragment -v -f -r -t {str(EXTENT_SIZE)} "{PATH}"'
+      )
+      if DEBUG:
+          dbg(ret)
+          dbg('--- Fragmentation after')
+          dbg(qx(f'filefrag {PATH}/*'))
+      self.ack()
 
 plugin = BtrfsDefragPlugin()
 plugin.main()
